@@ -1,3 +1,5 @@
+from turtle import update
+from unittest import expectedFailure
 import requests
 import sys
 
@@ -7,9 +9,26 @@ def send_message(token, id, text):
     return response.status_code == 200
 
 
-def get_message(token, offset):
+def get_updates(token, offset):
     response = requests.get(f'https://api.telegram.org/bot{token}/getUpdates', params={'offset': offset,'timeout': 60})
-    return response.json()
+
+    if response.status_code != 200:
+        print(f'Status code: {response.status_code}')
+        return False
+
+    try:
+        updates = response.json()
+    except requests.exceptions.JSONDecodeError:
+        print('JSONDecodeError')
+        return False
+    
+    if 'result' not in updates:
+        print("'result' key don't exists'")
+        return False
+
+    return updates['result']
+
+
 
 
 if len(sys.argv) != 2:
@@ -20,8 +39,9 @@ token = sys.argv[1]
 offset = -1
 
 while True:
-    message = get_message(token, offset)
-    if message['ok'] and message['result']:
-        chat_id = message['result'][0]['message']['chat']['id']
-        send_message(token, chat_id, 'Hello!')
-        offset = message['result'][0]['update_id'] + 1
+    updates = get_updates(token, offset)
+    if updates:
+        for update in updates:
+            chat_id = update['message']['chat']['id']
+            send_message(token, chat_id, 'Hello!')
+        offset = updates[-1]['update_id'] + 1
