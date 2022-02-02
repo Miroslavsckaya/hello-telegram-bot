@@ -1,5 +1,3 @@
-from turtle import update
-from unittest import expectedFailure
 import requests
 import sys
 
@@ -31,7 +29,7 @@ def get_updates(token, offset):
 
 
 
-if len(sys.argv) != 2:
+if len(sys.argv) < 2:
     print('Usage: ./hello_bot.py token')
     sys.exit(1)
 
