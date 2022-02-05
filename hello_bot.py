@@ -39,15 +39,23 @@ offset = -1
 while True:
     updates = get_updates(token, offset)
     if updates:
-        for update in updates:
-            chat_id = update['message']['chat']['id']
-            
-            text_words = update['message']['text'].split()
-            if '/name' in text_words and text_words[-1] != '/name':
-                index = text_words.index('/name')
-                username = text_words[index +  1]
-                send_message(token, chat_id, f'Hello, {username}')
-            else:
-                send_message(token, chat_id, "What's your name?")
+        with open('usernames.csv', 'a+', encoding='utf-8', newline='') as file:
+            for update in updates:
+                chat_id = update['message']['chat']['id']
+                user_id = update['message']['from']['id']
+                
+                f = csv.DictWriter(file, fieldnames=['user_id', 'name'])
+                if not file.tell():
+                    f.writeheader()
+
+                text_words = update['message']['text'].split()
+                if '/name' in text_words and text_words[-1] != '/name':
+                    index = text_words.index('/name')
+                    username = text_words[index +  1]
+                    send_message(token, chat_id, f'Hello, {username}')
+
+                    f.writerow({'user_id': user_id, 'name': username})
+                else:
+                    send_message(token, chat_id, "What's your name?")
     
         offset = updates[-1]['update_id'] + 1
