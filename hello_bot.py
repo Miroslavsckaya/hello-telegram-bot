@@ -1,3 +1,4 @@
+from cgitb import text
 import requests
 import csv
 import sys
@@ -28,6 +29,18 @@ def get_updates(token, offset):
     return updates['result']
 
 
+def get_users(filename):
+    with open(filename, 'a+', encoding='utf-8') as file:
+        file.seek(0)
+        return list(csv.DictReader(file, fieldnames=['user_id', 'name']))
+
+
+def write_users(filename, users):
+    with open(filename, 'w', encoding='utf-8', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=['user_id', 'name'])
+        for user in users:
+            writer.writerow(user)
+
 
 if len(sys.argv) < 2:
     print('Usage: ./hello_bot.py token')
@@ -36,9 +49,7 @@ if len(sys.argv) < 2:
 token = sys.argv[1]
 offset = -1
 
-with open('usernames.csv', 'a+', encoding='utf-8') as file:
-    file.seek(0)
-    usernames = list(csv.DictReader(file, fieldnames=['user_id', 'name']))
+users = get_users('usernames.csv')
 
 while True:
     updates = get_updates(token, offset)
@@ -47,35 +58,28 @@ while True:
             chat_id = update['message']['chat']['id']
             user_id = str(update['message']['from']['id'])
             username = ''
+            index = -1
 
-            text_words = update['message']['text'].split()
-            if '/name' in text_words and text_words[-1] != '/name':
-                index = text_words.index('/name')
-                username = text_words[index +  1]
-                send_message(token, chat_id, f'Hello, {username}')
-
-                for user in usernames:
-                    if user['user_id'] == user_id:
-                        user['name'] = username
-                        break
-                else:
-                    usernames.append({'user_id': user_id, 'name': username})
-                
-                continue
-            
-            for user in usernames:
+            for index, user in enumerate(users):
                 if user['user_id'] == user_id:
                     username = user['name']
                     break
-            
+
+            text_words = update['message']['text'].split()
+            if text_words[0] == '/name' and len(text_words) > 1:
+                username = text_words[1]
+
+                if index != -1:
+                    users[index]['name'] = username
+                else:
+                    users.append({'user_id': user_id, 'name': username})
+                           
             if username:
                 send_message(token, chat_id, f'Hello, {username}')
             else:
                 send_message(token, chat_id, r'Send me your name prepended with /name command')
     
-        offset = updates[-1]['update_id'] + 1
-        with open('usernames.csv', 'w', encoding='utf-8', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=['user_id', 'name'])
-            for user in usernames:
-                writer.writerow(user)
+            offset = update['update_id'] + 1
+
+        write_users('usernames.csv', users)
 
