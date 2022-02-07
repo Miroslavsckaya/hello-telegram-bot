@@ -52,33 +52,40 @@ users = get_users('usernames.csv')
 
 while True:
     updates = get_updates(token, offset)
-    if updates:
-        for update in updates:
-            chat_id = update['message']['chat']['id']
-            user_id = str(update['message']['from']['id'])
-            username = ''
-            index = -1
-
-            for index, user in enumerate(users):
-                if user['user_id'] == user_id:
-                    username = user['name']
-                    break
-
-            text_words = update['message']['text'].split()
-            if text_words[0] == '/name' and len(text_words) > 1:
-                username = text_words[1]
-
-                if index != -1:
-                    users[index]['name'] = username
-                else:
-                    users.append({'user_id': user_id, 'name': username})
-                           
-            if username:
-                send_message(token, chat_id, f'Hello, {username}')
-            else:
-                send_message(token, chat_id, r'Send me your name prepended with /name command')
     
-            offset = update['update_id'] + 1
+    if not updates:
+        continue
 
-        write_users('usernames.csv', users)
+    for update in updates:
+        chat_id = update['message']['chat']['id']
+        user_id = str(update['message']['from']['id'])
+        username = ''
+        index = -1
+
+        for index, user in enumerate(users):
+            if user['user_id'] == user_id:
+                username = user['name']
+                break
+
+        if 'text' in update['message']:
+            text_words = update['message']['text'].split()
+        else:
+            text_words = []
+
+        if len(text_words) > 1 and text_words[0] == '/name':
+            username = text_words[1]
+
+            if index != -1:
+                users[index]['name'] = username
+            else:
+                users.append({'user_id': user_id, 'name': username})
+                    
+        if username:
+            send_message(token, chat_id, f'Hello, {username}')
+        else:
+            send_message(token, chat_id, r'Send me your name prepended with /name command')
+
+        offset = update['update_id'] + 1
+
+    write_users('usernames.csv', users)
 
