@@ -1,4 +1,5 @@
 import requests
+import csv
 import sys
 
 
@@ -27,6 +28,17 @@ def get_updates(token, offset):
     return updates['result']
 
 
+def get_users(filename):
+    with open(filename, 'a+', encoding='utf-8') as file:
+        file.seek(0)
+        return list(csv.DictReader(file, fieldnames=['user_id', 'name']))
+
+
+def write_users(filename, users):
+    with open(filename, 'w', encoding='utf-8', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=['user_id', 'name'])
+        for user in users:
+            writer.writerow(user)
 
 
 if len(sys.argv) < 2:
@@ -36,10 +48,44 @@ if len(sys.argv) < 2:
 token = sys.argv[1]
 offset = -1
 
+users = get_users('usernames.csv')
+
 while True:
     updates = get_updates(token, offset)
-    if updates:
-        for update in updates:
-            chat_id = update['message']['chat']['id']
-            send_message(token, chat_id, 'Hello!')
-        offset = updates[-1]['update_id'] + 1
+    
+    if not updates:
+        continue
+
+    for update in updates:
+        chat_id = update['message']['chat']['id']
+        user_id = str(update['message']['from']['id'])
+        username = ''
+        index = -1
+
+        for index, user in enumerate(users):
+            if user['user_id'] == user_id:
+                username = user['name']
+                break
+
+        if 'text' in update['message']:
+            text_words = update['message']['text'].split()
+        else:
+            text_words = []
+
+        if len(text_words) > 1 and text_words[0] == '/name':
+            username = text_words[1]
+
+            if index != -1:
+                users[index]['name'] = username
+            else:
+                users.append({'user_id': user_id, 'name': username})
+                    
+        if username:
+            send_message(token, chat_id, f'Hello, {username}')
+        else:
+            send_message(token, chat_id, r'Send me your name prepended with /name command')
+
+        offset = update['update_id'] + 1
+
+    write_users('usernames.csv', users)
+
