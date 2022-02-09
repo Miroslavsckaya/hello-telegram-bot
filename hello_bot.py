@@ -1,6 +1,7 @@
+from dotenv import load_dotenv
 import requests
 import csv
-import sys
+import os
 
 
 def send_message(token, id, text):
@@ -41,11 +42,9 @@ def write_users(filename, users):
             writer.writerow(user)
 
 
-if len(sys.argv) < 2:
-    print('Usage: ./hello_bot.py token')
-    sys.exit(1)
+load_dotenv()
 
-token = sys.argv[1]
+token = os.getenv('APY_KEY')
 offset = -1
 
 users = get_users('usernames.csv')
