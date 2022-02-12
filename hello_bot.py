@@ -29,18 +29,22 @@ def get_updates(token, offset):
     return updates['result']
 
 
+def get_username(connect):
+    username = connect.execute('SELECT username FROM usernames WHERE id = ?', (user_id,)).fetchone()
+    return '' if username is None else username[0]
+
+
+def write_user(connect, user_id, username):
+    connect.execute('INSERT INTO usernames VALUES (:id, :username) ON CONFLICT (id) DO UPDATE SET username = :username', {'id': user_id, 'username': username})
+
+
 load_dotenv()
 
 token = os.getenv('APY_KEY')
 offset = -1
 
-open('users.db', 'a').close()
-conn = sqlite3.connect('users.db', isolation_level=None)
-
-try:
-    conn.execute('SELECT * FROM usernames')
-except sqlite3.OperationalError:
-    conn.execute('CREATE TABLE usernames (id INTEGER, username TEXT, PRIMARY KEY(id))')
+conn = sqlite3.connect('users.jpeg', isolation_level=None)
+conn.execute('CREATE TABLE IF NOT EXISTS usernames (id INTEGER, username TEXT, PRIMARY KEY(id))')
 
 while True:
     updates = get_updates(token, offset)
@@ -51,7 +55,7 @@ while True:
     for update in updates:
         chat_id = update['message']['chat']['id']
         user_id = update['message']['from']['id']
-        username = conn.execute('SELECT username FROM usernames WHERE id = ?', (user_id,)).fetchone()
+        username = get_username(conn)
 
         if 'text' in update['message']:
             text_words = update['message']['text'].split()
@@ -61,12 +65,10 @@ while True:
         if len(text_words) > 1 and text_words[0] == '/name':
             username = text_words[1]
 
-            conn.execute('INSERT INTO usernames VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET username = ?', (user_id, username, username))
-
         if username:
-            username = str(username).strip("(),'")
             send_message(token, chat_id, f'Hello, {username}')
         else:
             send_message(token, chat_id, r'Send me your name prepended with /name command')
 
+        write_user(conn, user_id, username)
         offset = update['update_id'] + 1
