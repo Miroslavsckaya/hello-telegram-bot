@@ -43,7 +43,7 @@ load_dotenv()
 token = os.getenv('APY_KEY')
 offset = -1
 
-conn = sqlite3.connect('users.jpeg', isolation_level=None)
+conn = sqlite3.connect('users.db', isolation_level=None)
 conn.execute('CREATE TABLE IF NOT EXISTS usernames (id INTEGER, username TEXT, PRIMARY KEY(id))')
 
 while True:
