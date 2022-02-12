@@ -29,13 +29,13 @@ def get_updates(token, offset):
     return updates['result']
 
 
-def get_username(connect):
-    username = connect.execute('SELECT username FROM usernames WHERE id = ?', (user_id,)).fetchone()
+def get_username(conn, user_id):
+    username = conn.execute('SELECT username FROM usernames WHERE id = ?', (user_id,)).fetchone()
     return '' if username is None else username[0]
 
 
-def write_user(connect, user_id, username):
-    connect.execute('INSERT INTO usernames VALUES (:id, :username) ON CONFLICT (id) DO UPDATE SET username = :username', {'id': user_id, 'username': username})
+def write_user(conn, user_id, username):
+    conn.execute('INSERT INTO usernames VALUES (:id, :username) ON CONFLICT (id) DO UPDATE SET username = :username', {'id': user_id, 'username': username})
 
 
 load_dotenv()
@@ -55,7 +55,7 @@ while True:
     for update in updates:
         chat_id = update['message']['chat']['id']
         user_id = update['message']['from']['id']
-        username = get_username(conn)
+        username = get_username(conn, user_id)
 
         if 'text' in update['message']:
             text_words = update['message']['text'].split()
