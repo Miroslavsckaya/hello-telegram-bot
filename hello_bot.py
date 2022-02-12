@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import requests
-import csv
 import os
+import sqlite3
 
 
 def send_message(token, id, text):
@@ -29,17 +29,13 @@ def get_updates(token, offset):
     return updates['result']
 
 
-def get_users(filename):
-    with open(filename, 'a+', encoding='utf-8') as file:
-        file.seek(0)
-        return list(csv.DictReader(file, fieldnames=['user_id', 'name']))
+def get_username(conn, user_id):
+    username = conn.execute('SELECT username FROM usernames WHERE id = ?', (user_id,)).fetchone()
+    return '' if username is None else username[0]
 
 
-def write_users(filename, users):
-    with open(filename, 'w', encoding='utf-8', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=['user_id', 'name'])
-        for user in users:
-            writer.writerow(user)
+def write_user(conn, user_id, username):
+    conn.execute('INSERT INTO usernames VALUES (:id, :username) ON CONFLICT (id) DO UPDATE SET username = :username', {'id': user_id, 'username': username})
 
 
 load_dotenv()
@@ -47,7 +43,8 @@ load_dotenv()
 token = os.getenv('APY_KEY')
 offset = -1
 
-users = get_users('usernames.csv')
+conn = sqlite3.connect('users.db', isolation_level=None)
+conn.execute('CREATE TABLE IF NOT EXISTS usernames (id INTEGER, username TEXT, PRIMARY KEY(id))')
 
 while True:
     updates = get_updates(token, offset)
@@ -57,14 +54,8 @@ while True:
 
     for update in updates:
         chat_id = update['message']['chat']['id']
-        user_id = str(update['message']['from']['id'])
-        username = ''
-        index = -1
-
-        for index, user in enumerate(users):
-            if user['user_id'] == user_id:
-                username = user['name']
-                break
+        user_id = update['message']['from']['id']
+        username = get_username(conn, user_id)
 
         if 'text' in update['message']:
             text_words = update['message']['text'].split()
@@ -74,17 +65,10 @@ while True:
         if len(text_words) > 1 and text_words[0] == '/name':
             username = text_words[1]
 
-            if index != -1:
-                users[index]['name'] = username
-            else:
-                users.append({'user_id': user_id, 'name': username})
-                    
         if username:
             send_message(token, chat_id, f'Hello, {username}')
         else:
             send_message(token, chat_id, r'Send me your name prepended with /name command')
 
+        write_user(conn, user_id, username)
         offset = update['update_id'] + 1
-
-    write_users('usernames.csv', users)
-
