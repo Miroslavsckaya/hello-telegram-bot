@@ -29,9 +29,9 @@ def get_updates(token, offset):
     return updates['result']
 
 
-def get_username(conn, user_id):
+def get_username(conn, user_id, sender):
     username = conn.execute('SELECT username FROM usernames WHERE id = ?', (user_id,)).fetchone()
-    return '' if username is None else username[0]
+    return sender['first_name'] if username is None else username[0]
 
 
 def write_user(conn, user_id, username):
@@ -55,7 +55,7 @@ while True:
     for update in updates:
         chat_id = update['message']['chat']['id']
         user_id = update['message']['from']['id']
-        username = get_username(conn, user_id)
+        username = get_username(conn, user_id, update['message']['from'])
 
         if 'text' in update['message']:
             text_words = update['message']['text'].split()
@@ -65,10 +65,7 @@ while True:
         if len(text_words) > 1 and text_words[0] == '/name':
             username = text_words[1]
 
-        if username:
-            send_message(token, chat_id, f'Hello, {username}')
-        else:
-            send_message(token, chat_id, r'Send me your name prepended with /name command')
+        send_message(token, chat_id, f'Hello, {username}')
 
         write_user(conn, user_id, username)
         offset = update['update_id'] + 1
