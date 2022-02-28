@@ -1,3 +1,4 @@
+from wsgiref.util import request_uri
 from dotenv import load_dotenv
 import requests
 import os
@@ -29,13 +30,53 @@ def get_updates(token, offset):
     return updates['result']
 
 
-def get_username(conn, user_id):
+def get_username(conn, user_id, sender):
     username = conn.execute('SELECT username FROM usernames WHERE id = ?', (user_id,)).fetchone()
-    return '' if username is None else username[0]
+    return sender['first_name'] if username is None else username[0]
 
 
 def write_user(conn, user_id, username):
     conn.execute('INSERT INTO usernames VALUES (:id, :username) ON CONFLICT (id) DO UPDATE SET username = :username', {'id': user_id, 'username': username})
+
+
+def get_advice():
+    response = requests.get('http://fucking-great-advice.ru/api/random')
+
+    if response.status_code != 200:
+        print(f'Status code: {response.status_code}')
+        return False
+
+    try:
+        advice = response.json()
+    except requests.exceptions.JSONDecodeError:
+        print('JSONDecodeError')
+        return False
+    
+    if 'text' not in advice:
+        print("'text' key don't exists'")
+        return False
+
+    return advice['text']
+
+
+def advice_comand(n):
+    for _ in range(n):
+        advice = get_advice()
+        if advice:
+            send_message(token, chat_id, advice)
+
+
+def comand_handler(text_words):
+    if not len(text_words):
+        return False
+
+    if text_words[0] == '/advice':
+        try:
+            n = int(text_words[1])
+        except:
+            n = 1
+        advice_comand(n)
+        return True
 
 
 load_dotenv()
@@ -55,7 +96,7 @@ while True:
     for update in updates:
         chat_id = update['message']['chat']['id']
         user_id = update['message']['from']['id']
-        username = get_username(conn, user_id)
+        username = get_username(conn, user_id, update['message']['from'])
 
         if 'text' in update['message']:
             text_words = update['message']['text'].split()
@@ -64,11 +105,9 @@ while True:
 
         if len(text_words) > 1 and text_words[0] == '/name':
             username = text_words[1]
-
-        if username:
+        
+        if not comand_handler(text_words):
             send_message(token, chat_id, f'Hello, {username}')
-        else:
-            send_message(token, chat_id, r'Send me your name prepended with /name command')
 
         write_user(conn, user_id, username)
         offset = update['update_id'] + 1
